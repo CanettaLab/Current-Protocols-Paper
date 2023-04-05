@@ -1,0 +1,287 @@
+\                        C O M M E N T S
+\===================================================================
+            \RANDOM INTERVAL LEVER PRESS
+\===================================================================
+\ Right lever is used in this program
+
+
+\===================================================================
+\                  CONSTANTS USED IN THIS PROGRAM
+\===================================================================
+\  INPUTS
+\===================================================================
+
+^LLev = 2       \  left lever press
+^RLev = 1       \  right lever press
+^headIN = 4     \  IR head entry detector
+^headOUT = 4    \  IR head exit detector
+^Nosething = 3  \  Nose poke
+\===================================================================
+
+
+\===================================================================
+\  OUTPUTS
+\===================================================================
+^LLever = 8        \Left lever
+^RLever = 7        \Right lever
+^Dipper = 6        \Liquid Dipper
+^House = 1             \Houselight
+^FeederLight = 9       \Light in Food Receptacle
+^Fan = 12        \Fans for Box ventilation
+^NoseThingLight = 2
+
+\===================================================================
+
+
+\===================================================================
+\  VARIABLES USED IN THIS PROGRAM
+\ () INDICATES ARRAY VARIABLE
+\===================================================================
+\  (a) = holder for lever press start
+\  (b) = holder for lever press end
+\   c = holder for RI duration
+\   d =
+\   e = RI List
+\   f =
+\   g =
+\   h =
+\   i =
+\   j = counter for dipper delivery
+\  (k) = session timer (sec)
+\   l = pellet counter
+\   m =
+\   n = resetting interval counter
+\   o =
+\   p = event counter for w array
+\   q =
+\   r =
+\  (s) = press counter array (0=right, 1=left)
+\   t = data array timer
+\   u =
+\   v =
+\  (w) = Time stamped event code array
+\   x =
+\   y =
+\   z =
+\===================================================================
+
+
+\===================================================================
+\  SHOW POSITIONS
+\===================================================================
+\  1 =  Session clock
+\  2 =  Right lever presses
+\  3 =  Left lever presses
+\  4 =
+\  5 =  Reinforcers delivered
+\===================================================================
+
+
+\===================================================================
+\   Z-PULSES USED IN THIS PROGRAM
+\===================================================================
+\   z1 = Start RI controller
+\   z2 = End program
+\   z3 = Left lever press
+\   z4 = Right lever press
+\   z5 =
+\   z6 = Reinforcer delivery (dipper)
+\   z7 =
+\   z8 =
+\   z9 =
+\===================================================================
+
+
+\===================================================================
+\EVENT CODES USED IN THIS PROGRAM
+\===================================================================
+^DipOn = 0025
+^DipOff = 0026
+
+^LLeverOn = 0027 \***
+^RLeverOn= 0090  \***  code for nosethinglighton
+^LLeverOff = 0029 \***
+^RLeverOff = 0089 \***   code for nosethinglightoff
+
+
+^NoseThingLightOFF = 0030  \code for RLeveroff 
+^NoseThingLightON = 0028   \code for Rleveron
+
+^RIStart = 0123
+^RIOver = 0124
+
+^FeederLightOff = 0035
+^FeederLightOn = 0045
+
+^StartSession = 0113
+^EndSession = 0114
+
+^OnFan = 0117
+^OffFan = 0118
+
+^HeadExit = 1001
+^HeadEntry = 1011
+
+^LPressOn = 1015
+^LPressOff = 1017
+^RPressOn = 0085  \code for nosethingon
+^RPressOff = 0088   \code for nosethingoff
+
+^NoseThingON = 1016   \code for rleverpresson
+     
+^NoseThingOFF = 1018   \code for rleverpressoff
+\================================================================
+
+
+\===================================================================
+\FORMATTING
+\===================================================================
+DISKFORMAT = 13
+DISKVARS = W,S,J
+DISKCOLUMNS = 1
+\===================================================================
+
+
+\===================================================================
+\ARRAYS
+\===================================================================
+dim w=100000
+dim k=6  \array for the session timer
+dim a=3
+dim b=3
+dim s=3
+\===================================================================
+
+
+\===================================================================
+\LISTS
+\===================================================================
+\RI-5
+list e = 1,1,1,1,2
+
+\===================================================================
+
+
+
+\===================================================================
+\===================================================================
+
+
+S.S.2,  \Timer for time-stamped event data array
+s1,
+    0":    SET p = -1; --->s2
+s2,
+    .02":    SET T = T + 100000--->sx
+
+S.S.3,  \Session Start Stop Controller
+s1,
+         #start:     add p;set w(p)=^StartSession+T;
+               ON^Fan; add p;set w(p)=^OnFan+T; ON^House;
+		ON^NoseThingLight;add p;set w(p)=^NoseThingLightON;
+          	z1---> s2
+s2,
+         60':  --->s3
+         #z2:  --->s3
+s3,
+         .1":      off^Fan; add p;set w(p)=^OffFan+T;
+           Off^NoseThingLight; add p;set w(p)=^NoseThingLightOFF+T; OFF^House;
+           add p;set w(p)=^EndSession+T;
+               add p;set w(p)=-987.987; ---> stopabortflush
+
+s.s.4, \Random Interval reinforcement controller
+s1,
+        #z1:     add p;set w(p)=^RIStart+T--->s2
+s2,
+        1":    add n; randi c=e; show 5, reinforced, c; if c = 2[@nosethingOn,@NosethingOff]
+                    @NosethingOn: set n=0;  add p;set w(p)=^RIOver+T;--->s3
+                    @NosethingOff:if n>200 [@go,@wait]
+                @go:add p;set w(p)=^RIOver+T;set n=0--->s3
+                @wait:--->s2
+s3,
+    #z4:    z6 --->s1
+
+S.S.6, \Dipper Delivery
+s1,
+    #z6:      ON^dipper;add p;set w(p)=^dipON+T;
+        add p;set w(p)=^FeederLightOn+T;
+        add j; show 4, Dipper, j;--->s2
+s2,
+    .5":     add p;set w(p)=^FeederLightOff+T--->s3
+s3,
+      4.5":    off^dipper;add p;set w(p)=^DipOff+T;
+                if j>59 [@End, @More]
+            @End:  z2 --->s1
+                       @More: z1 --->s1
+
+S.S.7,  \Head Entry Detector
+S1,
+    #start: SHOW 3,HeadIn,v --->s2
+s2,
+       .1":     if a(2) > 0 [@insert, @noinsert]
+            @insert: if b(2) = 0 [@on, @off]
+                    @on: set b(2) = 1; set a(2) = 0;
+                          add v;show 3, HeadIn, v;
+                          add p; set w(p) = ^HeadEntry+T --->s2
+                    @off: set b(2)=1; set a(2)=0--->s2
+            @noinsert: if b(2)=1 [@stop, @nostop]
+                    @stop:    set b(2)=a(2); set a(2)=0; 
+                        add p; set w(p)=^HeadExit+T --->s2
+                    @nostop:set b(2)=a(2); set a(2)=0--->s2
+        #R^headIN : set a(2)=a(2)+1--->sx
+
+S.S.8,  \Bar Press Detector - Left Lever - not used in this program
+s1,
+    #Start: --->s2
+s2,
+    .05":    if a(0) > 0 [@press, @nopress]
+                    @press: if b(0) = 0 [@leveron, @noleveron]
+                           @leveron: z3;  add p; set w(p)= ^LPressOn+T;
+                                     add s(0); show 2, LeftPress, s(0);
+                                      set b(0) = 1; set a(0) = 0; --->s2
+                            @noleveron: set b(0) = 1; set a(0) = 0--->s2
+                @nopress: if b(0) = 1 [@stop, @nostop]
+                        @stop:    add p;set w(p)= ^LPressOff+T;
+                                    set b(0) = a(0); set a(0) = 0; --->s2
+                        @nostop:  set b(0) = a(0); set a(0) = 0; --->s2
+        #R^LLev: set a(0)=a(0)+1; --->sx
+
+S.S.9,  \Bar Press Detector - Right Lever
+s1,
+    #Start: --->s2
+s2,
+       .05":     if a(0) > 0 [@press, @nopress]
+                    @press: if b(0) = 0 [@leveron, @noleveron]
+                            @leveron: z3; add p;set w(p)= ^RPressOn+T;
+                                      add s(0); show 2, RightPress, s(0);
+                                     set b(0) = 1; set a(0) = 0; --->s2
+                            @noleveron: set b(0) = 1; set a(0) = 0--->s2
+                    @nopress: if b(0) = 1 [@stop, @nostop]
+                            @stop:  add p;set w(p)= ^RPressOff+T;
+                                  set b(0) = a(0); set a(0) = 0; --->s2
+                            @nostop:set b(0) = a(0); set a(0) = 0; --->s2
+        #R^RLev: set a(0)=a(0)+1; --->sx
+
+S.S.10,  \Bar Press Detector - Nosething
+s1,
+    #Start: --->s2
+s2,
+       .05":     if a(1) > 0 [@insert, @noinsert]
+                    @insert: if b(1) = 0 [@nosethingon, @nonosethingon]
+                            @nosethingon: z4; add p;set w(p)= ^NoseThingON+T;
+                                      add s(1); show 2, Nosething, s(1);
+                                     set b(1) = 1; set a(1) = 0; --->s2
+                            @nonosethingon: set b(1) = 1; set a(1) = 0--->s2
+                    @noinsert: if b(1) = 1 [@stop, @nostop]
+                            @stop:  add p;set w(p)= ^NoseThingOFF+T;
+                                  set b(1) = a(1); set a(1) = 0; --->s2
+                            @nostop:set b(1) = a(1); set a(1) = 0; --->s2
+        #R^Nosething: set a(1)=a(1)+1; --->sx
+
+s.s.11 \Session Duration Clock
+s1,
+    #start:--->s2
+s2,
+    1":    set k(0)=k(0)+.01; if k(0)>.59 [@AddMin, @NoAdd]
+                    @AddMin: add k(1); set k(0)=0;
+                          set k(2)=k(0)+k(1);show 1, Session, k(2) --->s2
+                    @NoAdd:  set k(2)=k(0)+k(1);show 1, Session, k(2)--->s2

@@ -1,0 +1,241 @@
+\                        C O M M E N T S
+
+\===================================================================
+            \PROGRESSIVE RATIO 
+\===================================================================
+\ Right lever is used in this program
+
+
+\===================================================================
+\                  CONSTANTS USED IN THIS PROGRAM
+\===================================================================
+\  INPUTS
+\===================================================================
+
+^headIN = 4       \  IR head entry detector
+^headOUT = 4      \ IR head exit detector
+^LLever2 = 2       \  left lever press
+^RLever2 = 1       \  right lever press
+\===================================================================
+
+
+\===================================================================
+\  OUTPUTS
+\===================================================================
+^leftlever = 8    \Left lever
+^rightlever =7    \Right lever
+^fan = 12         \ Fans for Box ventilation
+^dipper = 6        \ On Liquid Dipper
+^house = 1         \houselight
+\===================================================================
+
+\===================================================================
+\  VARIABLES USED IN THIS PROGRAM
+\ () INDICATES ARRAY VARIABLE
+\===================================================================
+\   a = holder for lever press
+\   b = holder for lever press off
+\   c = resetting lever press counter for PR Control
+\   d =
+\   e =
+\   f =
+\   g =
+\   h =
+\   i =
+\   j = number of reinforcers
+\   k = session timer
+\   l = ratio requirement for current reinforcer
+\   m = array of ratio values for each reinforcer
+\   n =
+\   o = counter for m array
+\   p = counter for w array
+\   q =
+\   r = lever press holder
+\   s =
+\   t
+\   u
+\   v
+\  (w) = time and event code array
+\   x =
+\   y
+\   z
+
+
+\===================================================================
+\  SHOW POSITIONS
+\===================================================================
+\  1 = session timer
+\  2 =
+\  3 =
+\  4 =
+\  5 =
+
+
+\===================================================================
+\EVENT CODES USED IN THIS PROGRAM
+\===================================================================
+^DipOn = 0025
+^DipOff = 0026
+
+^LLeverOn = 0027
+^RLeverOn= 0028
+^LLeverOff = 0029
+^RLeverOff = 0030
+
+^StartSession = 0113
+^EndSession = 0114
+
+^HouseLightOff = 0115
+^HouseLightOn = 0116
+^OnFan = 0117
+^OffFan = 0118
+
+^StartStanFlash = 0209
+^StopStanFlash = 0211
+^StartCompFlash = 0212
+^StopCompFlash = 0213
+^STNonGapNonProbe = 0214
+^STNonGapProbe = 0215
+^STGapNonProbe = 0216
+^STGapProbe = 0217
+
+^PokeOff1 = 1001
+^PokeOn1 = 1011
+
+^LPressOn = 1015
+^RPressOn = 1016
+^LPressOff = 1017
+^RPressOff = 1018
+\================================================================
+
+\ Formatting standards
+\ saves w data array, number of reinforcers, and array of ratio requirements
+
+DISKFORMAT = 13
+DISKVARS = J,M,W
+DISKCOLUMNS = 1
+
+\Dimensionalize Event and Time code array
+
+dim w=50000
+dim a=3
+dim b=3
+dim k=4
+dim r=2
+dim m=100
+
+
+\===============================
+\   Z-PULSES USED IN THIS PROGRAM
+\ z1 = dipper up (initiate timer D)
+\ z2 = reset dipper timer
+\ z3 = 5min w/o press
+\ z4 = starting timing interresponse intervals
+\===============================
+
+
+s.s.1,  \MATLAB TIMER "T"
+s1,
+        0": SET p=-1; set q=-1; --->s2
+s2,
+        .01": SET T = T + 100000 --->sx  \Keeps time in 100th of a second
+
+S.S.2,    \Program Controller
+s1,
+    #start: 
+            ON^fan; add p; set w(p)= ^OnFan + T;
+             ON^house; add p; set w(p)= ^HouseLightOn + T---> s2
+s2,
+     120':   off^rightlever; add p; set w(p)=^RLeverOff+T --->s3
+    #z3:    off^rightlever; add p; set w(p)=^RLeverOff+T--->s3
+s3,
+        5":    OFF^house;add p; set w(p) = ^HouseLightOff + T;
+                OFF^fan;add p; set w(p) = ^OffFan + T;
+                add p; set w(p)= ^EndSession + T;
+        add q; set m(q)=-987.987;
+                add p; set w(p)=-987.987;     --->stopabortflush
+
+s.s.3,  \Reinforcer Controller
+s1,
+        #start:    add p; set w(p)= ^StartSession+T; set l=2;
+        add q; set m(q)=l --->s2
+s2,
+    5":    on^rightlever; add p; set w(p)=^RLeverOn+T--->s3
+s3,
+    #z2:    add c; if c=l [@reinf, @more]
+            @reinf: ON^dipper; add j;show 4,Dipper,j;
+                               add p; set w(p) =^DipOn+T--->s5
+            @more: --->s3
+
+s5,
+         5":    OFF^dipper;add p;set w(p)=^DipOff+T;
+        set c=0; set l=l*2; add q; set m(q)=l;
+        show 5, RatioReq, l --->s3
+
+S.S.4,  \Head Entry (Input 3) COUNTER
+S1,
+    #start: SHOW 3,HeadIn,v --->s2
+s2,
+       .1":     if a(2) > 0 [@insert, @noinsert]
+            @insert: if b(2) = 0 [@on, @off]
+                    @on: set b(2) = 1; set a(2) = 0;
+                          add v;show 3, HeadIn, v;
+                          add p; set w(p) = ^PokeOn1+T --->s2
+                    @off: set b(2)=1; set a(2)=0--->s2
+            @noinsert: if b(2)=1 [@stop, @nostop]
+                    @stop:    set b(2)=a(2); set a(2)=0; 
+                        add p; set w(p)=^PokeOff1+T --->s2
+                    @nostop:set b(2)=a(2); set a(2)=0--->s2
+        #R^headIN : set a(2)=a(2)+1--->sx
+
+s.s.5, \End session after 3' without lever press
+s1,
+    #start: --->s3
+s2,
+    #z1:--->s2
+    #z2:--->s2
+    3': z3 --->s1
+s3,
+    #z1:--->s2
+    #z2:--->s2
+
+S.S.6,  \Bar Press Detector - Left Lever - not used in this program
+s1,
+        #Start:    --->s2
+s2,
+       .05":     if a(0) > 0 [@press, @nopress]
+                    @press: if b(0) = 0 [@leveron, @noleveron]
+                           @leveron: z1;  add p; set w(p)= ^LPressOn+T;
+                                   add r(0); show 2, LeftPress, r(0);
+                                    set b(0) = 1; set a(0) = 0; --->s2
+                            @noleveron: set b(0) = 1; set a(0) = 0--->s2
+                @nopress: if b(0) = 1 [@stop, @nostop]
+                        @stop:  add p;set w(p)= ^LPressOff+T;
+                                  set b(0)=a(0); set a(0) = 0; --->s2
+                        @nostop:set b(0) = a(0); set a(0) = 0; --->s2
+        #R^LLever2: set a(0)=a(0)+1; --->sx
+
+S.S.7,  \Bar Press Detector - Right Lever
+s1,
+    #Start: --->s2
+s2,
+       .05": if a(1) > 0 [@press, @nopress]
+            @press: if b(1) = 0 [@leveron, @noleveron]
+                    @leveron: z2; add p;set w(p)= ^RPressOn+T;
+                            add r(1); show 2, RightPress, r(1);
+                           set b(1) = 1; set a(1) = 0; --->s2
+                    @noleveron: set b(1) = 1; set a(1) = 0--->s2
+            @nopress: if b(1) = 1 [@stop, @nostop]
+                    @stop:   add p;set w(p)= ^RPressOff+T;
+                          set b(1) = a(1); set a(1) = 0; --->s2
+                    @nostop:set b(1) = a(1); set a(1) = 0; --->s2
+        #R^RLever2: set a(1)=a(1)+1; --->sx
+
+S.S.8, \Session Duration Clock
+s1,
+    #start:--->s2
+s2,
+    1":    set k(0)=k(0)+.01; if k(0)>.59 [@AddMin, @NoAdd]
+            @AddMin: add k(1); set k(0)=0; set k(2)=k(0)+k(1);
+                 show 1, Session, k(2)--->s2
+            @NoAdd: set k(2)=k(0)+k(1); show 1, Session, k(2)--->s2

@@ -1,0 +1,248 @@
+\                        C O M M E N T S
+\===================================================================
+            \RANDOM RATIO
+\===================================================================
+
+DISKFORMAT = 13
+DISKVARS = p,w,e,f,c    \"DISKVARS" only prints selected variables to datafile
+DISK COLUMNS = 1
+
+
+\===================================================================
+\                  CONSTANTS USED IN THIS PROGRAM
+\===================================================================
+\  INPUTS
+\===================================================================
+^headIN = 4       \  IR head entry detector
+^headOUT = 4      \ IR head exit detector
+^LLever2 = 2       \  left lever press
+^RLever2 = 1       \  right lever press
+\===================================================================
+
+
+\===================================================================
+\  OUTPUTS
+\===================================================================
+^leftlever = 8
+^rightlever = 7
+^fan = 12         \ Fans for Box ventilation
+^dipper = 6        \ On Liquid Dipper
+^house = 1         \houselight
+^FeederLight = 9       \Light in Food Receptacle
+\===================================================================
+
+
+\===================================================================
+\  VARIABLES USED IN THIS PROGRAM
+\ () INDICATES ARRAY VARIABLE
+\===================================================================
+\   a =
+\   b =
+\   c = resetting bar press counter
+\   d = counter for e and f array
+\   e = responses/min array Left Lever
+\   f = responses/min array Right Lever
+\   g = responses/min counter Left Lever
+\   h = responses/min counter Right Lever
+\   i = Lever selector variable
+\   j = number of dippers
+\   (k) = Clock for session timer
+\   l = RR reinforcement Selection
+\   m = counter for n array
+\   n = array for RR requirements
+\   o =
+\   p =
+\   (q) = array for RR Reinforcement selection
+\   r =
+\   (s) = lever record 1=Left, 2=Right
+\   t =
+\   u =
+\   v =
+\  (w) = time and event code for matlab
+\   x =
+\   y =
+\   z =
+
+
+\  \  SHOW POSITIONS
+\  1 = current FR value
+\  2 = Dipper Timer
+\  3 = dipper counter
+\  4 = Session Time (sec)
+\  5 = head entries
+\  6 =
+
+\===================================================================
+\EVENT CODES USED IN THIS PROGRAM
+\===================================================================
+
+^DipOn = 0025   
+^DipOff = 0026 
+  
+^LLeverOn = 0027 
+^RLeverOn= 0028  
+^LLeverOff = 0029 
+^RLeverOff = 0030 
+
+^FeederLightOff = 0035
+^FeederLightOn = 0045
+
+^StartSession = 0113 
+^EndSession = 0114   
+
+^OnFan = 0117
+^OffFan = 0118
+
+^PokeOff1 = 1001
+^PokeOn1 = 1011
+
+^LLeverPressOn = 1015
+^LLeverPressOff = 1017
+^RLeverPressOn = 1016
+^RLeverPressOff = 1018
+\================================================================
+
+
+\Dimensionalize Event and Time code array
+
+dim w=20000
+dim k=3
+dim s=3
+dim n=1000
+dim e=25
+dim f=25
+dim a=2
+dim b=2
+
+\array for RR schedule selection = CRF program
+list q = 2,2,2
+
+
+
+
+\===============================
+\   Z-PULSES USED IN THIS PROGRAM
+\ z1 = dipper up (initiate timer D)
+\ z2 = reset dipper timer
+\ z4 = starting timing interresponse intervals
+\===============================
+
+
+s.s.1,  \MATLAB TIMER "T"
+s1,
+        0": SET p=-1; set i=2 --->s2
+s2,
+        .01": SET T = T + 100000 --->sx  \Keeps time in 50th of a second
+
+S.S.2,    \INITIALIZE
+s1,
+    #start:  
+        ON^fan; add p; set w(p)= ^OnFan + T; on^house ---> s2
+s2,
+    60':     --->s3
+
+s3,
+    .01": if S.S.6=1 [@end, @wait]
+        @end: OFF^RightLever; add p; set w(p)=^RLeverOff--->s4
+        @wait:--->s3
+
+s4,
+    .01":       OFF^fan;add p; set w(p) = ^OffFan + T;
+                add p; set w(p)= ^EndSession + T;
+                add p; set w(p)=-987.987 --->stopabortflush
+
+
+
+s.s.3,  \BP Counter and reinforcement decision
+s1,
+    #start:    add p; set w(p)= ^StartSession + T;
+        ON^RightLever;add p;set w(p)=^RLeverOn + T;--->s2
+s2,
+    #z2:    add c; add g;
+            randi l=q; show 5, Reinforced, l;
+            if l=2 [@Reinf,@MoreBP]
+                @Reinf: z1; z6; --->s2
+                @MoreBP:--->s2
+
+S.S.4  \Left Press recorder - not used in this program
+s1,
+    #start: --->s2
+s2,
+       .1":     if a(0) > 0 [@press, @nopress]
+            @press: if b(0) = 0 [@leveron, @noleveron]
+                    @leveron: set b(0) = 1; set a(0) = 0;
+                          add s(2);show 2, LLever, s(2);
+                          add p; set w(p) = ^LLeverPressOn+T --->s2
+                    @noleveron: set b(0) = 1; set a(0)=0--->s2
+            @nopress: if b(0) = 1 [@stop, @nostop]
+                    @stop:    set b(0) = a(0); set a(0) = 0;
+                        add p; set w(p) = ^LLeverPressOff + T--->s2
+                    @nostop:set b(0) = a(0); set a(0) = 0--->s2
+        #R^LLever2: set a(0) = a(0) + 1--->sx
+
+
+
+S.S.5  \Right Press recorder
+s1,
+    #start: --->s2
+s2,
+       .1":     if a(1) > 0 [@press, @nopress]
+            @press: if b(1) = 0 [@leveron, @noleveron]
+                    @leveron: set b(1) = 1; set a(1) = 0;
+                          z2; add s(1);show 2, RLever, s(1);
+                          add p; set w(p) = ^RLeverPressOn+T --->s2
+                    @noleveron: set b(1)=1; set a(1)=0--->s2
+            @nopress: if b(1)=1 [@stop, @nostop]
+                    @stop:    set b(1)=a(1); set a(1)=0;
+                        add p; set w(p)=^RLeverPressOff+T--->s2
+                    @nostop:set b(1)=a(1); set a(1)=0--->s2
+        #R^RLever2: set a(1)=a(1)+1--->sx
+
+S.S.6,
+s1,
+    #z6:    ON^dipper; add j; show 4, Dipper, j;
+		add p;set w(p)=^FeederLightOn+T;
+                 add p; set w(p) = ^DipOn + T--->s2
+s2,
+    .5":    add p;set w(p)=^FeederLightOff+T--->s3
+s3,
+         4.5":  OFF^dipper; add p; set w(p) = ^DipOff + T; if j<=59 [@go, @stop]
+                                                                     @go: --->s1
+                                                                     @stop: --->s4
+
+s4,
+   .01":       OFF^RightLever; add p; set w(p)=^RLeverOff; OFF^fan;add p; set w(p) = ^OffFan + T;
+                add p; set w(p)= ^EndSession + T;
+                add p; set w(p)=-987.987 --->stopabortflush
+
+
+S.S.7,  \Head Entry (Input 3) COUNTER
+S1,
+    #START:SHOW 3,HeadIn,v--->S2
+S2,
+    #R^headIN: add v;SHOW 3,HeadIn,v; add p; set w(p) = ^PokeOn1 + T---> sx
+    #R^headOUT: SHOW 3,HeadIn,1; add p; set w(p) = ^PokeOff1 + T--->sx
+
+
+S.S.8, \Session Duration Clock
+s1,
+    #start:--->s2
+s2,
+    1": set k(0)=k(0)+.01; if k(0)>.59 [@AddMin, @NoAdd]
+        @AddMin: add k(1); set k(0)=0; set k(2)=k(0)+k(1); show 1, Session, k(2) --->s2
+        @NoAdd: set k(2)=k(0)+k(1); show 1, Session, k(2)--->s2
+S.S.9,
+S1,
+    #z1: add m; set n(m)=c; set c=0 --->s1
+
+S.S.10, \records response rate in 1 min bins
+s1,
+    #start: --->s2
+s2,
+    1':     set e(d)=g; set g=0;
+        set f(d)=h; set h=0; add d;--->s2
+
+
+
+
+
